@@ -6,7 +6,6 @@ import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
 
-
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
 print('TensorFlow Version: {}'.format(tf.__version__))
@@ -34,7 +33,15 @@ def load_vgg(sess, vgg_path):
     vgg_layer4_out_tensor_name = 'layer4_out:0'
     vgg_layer7_out_tensor_name = 'layer7_out:0'
     
-    return None, None, None, None, None
+    tf.save_model.loader.load(sess, [vgg_tag], vgg_path)
+    graph = tf.get_default_graph()
+    input_tensor = graph.get_tensor_by_name(vgg_input_tensor_name)
+    keep_prob = graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
+    layer3_out = graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
+    layer4_out = graph.get_tensor_by_name(vgg_layer4_out_tensor_name)
+    layer7_out = graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
+    
+    return input_tensor, keep_prob, layer3_out, layer4_out, layer7_out
 tests.test_load_vgg(load_vgg, tf)
 
 
@@ -47,8 +54,34 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
+    #scale layers 3 and 4
+    layer3_scaled = tf.multiply(vgg_layer3_out, 0.0001)
+    lyaer3_conv1x1 = tf.layers.conv2d(layer3_scaled, num_classes, 1, (1,1), padding='same',
+                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    
+    layer4_scaled = tf.multiply(vgg_layer4_out, 0.01)
+    layer4_conv1x1 = tf.layers.conv2d(layer4_scaled, num_classes, 1, (1,1), padding='same',
+                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+
+    #1x1 convolutions to obtain desired number of num_classes
+    conv1x1_1 = tf.layers.conv2d(vgg, num_classes, 1, (1,1), padding='same',
+                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    
+    deconv_1 = tf.layers.conv2d_transpose(decoder_layer1, num_classes, 4, 2, padding='same',
+                                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    
+    skip_1 = tf.math.add(deconv_1, layer4_conv1x1)
+
+    deconv_2 = tf.layers.conv2d_transpose(decoder_layer1, num_classes, 4, 2, padding='same',
+                                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    
+    skip_2 = tf.math.add(deconv_2, layer4_conv1x1)
+
+    output_layer = tf.layers.conv2d_transpose(skip_2, num_classes, 16, 8, padding='same',
+                                              kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+        
     # TODO: Implement function
-    return None
+    return output_layer
 tests.test_layers(layers)
 
 
@@ -62,7 +95,14 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
     # TODO: Implement function
-    return None, None, None
+    reg_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES) #regularization loss
+    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(nn_last_layer, correct_label))
+    overall_loss = tf.math.add(reg_loss, cross_entropy_loss)
+    optimizer = tf.train.AdamOptimizer(learning_rate)
+
+    training_operation = optimizer.minimize(overall_loss)
+
+    return nn_last_layer, training_operation, overall_loss
 tests.test_optimize(optimize)
 
 
@@ -82,7 +122,24 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
-    pass
+    sess.run(tf.global_variables_initializer())
+    
+    print("Training...")
+    print()
+
+    for i in range(epochs):
+        #full_images, full_labels = get_batches_fn(-1)
+        for image, label in get_batches_fn(batch_size):
+
+            loss = sess.run([train_op, cross_entropy_loss], 
+                               feed_dict={input_image: image, correct_label: label,                                keep_prob: 0.5, learning_rate: 0.0009})
+            print("Loss: = {:.3f}".format(loss))
+        
+            print()
+
+        #print("EPOCH {} ...".format(i+1))
+
+    
 tests.test_train_nn(train_nn)
 
 
@@ -93,12 +150,19 @@ def run():
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
 
+    epochs = 8
+    batch_size = 16
+
     # Download pretrained vgg model
     helper.maybe_download_pretrained_vgg(data_dir)
 
     # OPTIONAL: Train and Inference on the cityscapes dataset instead of the Kitti dataset.
     # You'll need a GPU with at least 10 teraFLOPS to train on.
     #  https://www.cityscapes-dataset.com/
+
+    
+    correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes], name='correct_label')
+    learning_rate = 0.0005
 
     with tf.Session() as sess:
         # Path to vgg model
@@ -110,11 +174,17 @@ def run():
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         # TODO: Build NN using load_vgg, layers, and optimize function
+        input_image, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
 
+        nn_last_layer = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
+
+        logits, train_op, cross_entropy_loss = optimize(nn_last_layer, correct_label, learning_rate, num_classes)
+        
         # TODO: Train NN using the train_nn function
-
+        train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
+             correct_label, keep_prob, learning_rate)
         # TODO: Save inference data using helper.save_inference_samples
-        #  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
         # OPTIONAL: Apply the trained model to a video
 
