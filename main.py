@@ -132,6 +132,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 
     for i in range(epochs):
         #full_images, full_labels = get_batches_fn(-1)
+        print("EPOCH {} ...".format(i+1))
         for image, label in get_batches_fn(batch_size):
 
             optimizer, loss = sess.run([train_op, cross_entropy_loss], 
@@ -140,9 +141,6 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
         
             print()
 
-        #print("EPOCH {} ...".format(i+1))
-
-    
 tests.test_train_nn(train_nn)
 
 
@@ -153,8 +151,8 @@ def run():
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
 
-    epochs = 8
-    batch_size = 16
+    epochs = 12
+    batch_size = 32
 
     # Download pretrained vgg model
     helper.maybe_download_pretrained_vgg(data_dir)
@@ -189,6 +187,9 @@ def run():
         # TODO: Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
+        #save graph
+        tf.train.write_graph(sess.graph_def, './model', 'train.pb', as_text=False)
+        
         # OPTIONAL: Apply the trained model to a video
 
 
