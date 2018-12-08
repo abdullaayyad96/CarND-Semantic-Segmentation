@@ -114,7 +114,7 @@ def gen_test_output(sess, logits, keep_prob, image_pl, data_folder, image_shape)
     """
     for image_file in glob(os.path.join(data_folder, 'image_2', '*.png')):
         image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
-
+		
         im_softmax = sess.run(
             [tf.nn.softmax(logits)],
             {keep_prob: 1.0, image_pl: [image]})
@@ -124,7 +124,7 @@ def gen_test_output(sess, logits, keep_prob, image_pl, data_folder, image_shape)
         mask = scipy.misc.toimage(mask, mode="RGBA")
         street_im = scipy.misc.toimage(image)
         street_im.paste(mask, box=None, mask=mask)
-
+		
         yield os.path.basename(image_file), np.array(street_im)
 
 

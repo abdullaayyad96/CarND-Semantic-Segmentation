@@ -56,29 +56,26 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
     #scale layers 3 and 4
     layer3_scaled = tf.scalar_mul(0.0001, vgg_layer3_out)
-    layer3_conv1x1 = tf.layers.conv2d(layer3_scaled, num_classes, 1, (1,1), padding='same', 
-                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    layer3_conv1x1 = tf.layers.conv2d(layer3_scaled, num_classes, 1, (1,1), padding='same',                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer3_1x1conv')
     
     layer4_scaled = tf.scalar_mul(0.01, vgg_layer4_out)
-    layer4_conv1x1 = tf.layers.conv2d(layer4_scaled, num_classes, 1, (1,1), padding='same',
-                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    layer4_conv1x1 = tf.layers.conv2d(layer4_scaled, num_classes, 1, (1,1), padding='same',                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer4_1x1conv')
 
     #1x1 convolutions to obtain desired number of num_classes
-    conv1x1_1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, (1,1), padding='same', 
-                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+    conv1x1_1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, (1,1), padding='same',                                      kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer7_1x1conv')
    
     deconv_1 = tf.layers.conv2d_transpose(conv1x1_1, num_classes, 4, 2, padding='same', 
-                                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+                                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer7_deconv')
     
-    skip_1 = tf.add(deconv_1, layer4_conv1x1)
+    skip_1 = tf.add(deconv_1, layer4_conv1x1, name='layer_7_add_4')
 
     deconv_2 = tf.layers.conv2d_transpose(skip_1, num_classes, 4, 2, padding='same', 
-                                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+                                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer_74_deconv')
     
-    skip_2 = tf.add(deconv_2, layer3_conv1x1)
+    skip_2 = tf.add(deconv_2, layer3_conv1x1, name='layer_7_add_3')
 
     output_layer = tf.layers.conv2d_transpose(skip_2, num_classes, 16, 8, padding='same',
-                                              kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+                                              kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='output_layer')
         
     # TODO: Implement function
     return output_layer
@@ -94,15 +91,15 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :param num_classes: Number of classes to classify
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
-    logits = tf.reshape(nn_last_layer, (-1, num_classes))
+    logits = tf.reshape(nn_last_layer, (-1, num_classes), name='logits')
     
     # TODO: Implement function
     reg_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES) #regularization loss
-    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=nn_last_layer, labels=correct_label))
-    overall_loss = tf.add(1.0*sum(reg_loss), cross_entropy_loss)
+    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=nn_last_layer, labels=correct_label), name='cross_entropy_loss')
+    overall_loss = tf.add(1.0*sum(reg_loss), cross_entropy_loss, name='total_loss')
     
     optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate)
-    training_operation = optimizer.minimize(overall_loss)
+    training_operation = optimizer.minimize(overall_loss, name='train_op')
 
     return logits, training_operation, overall_loss
 
@@ -151,7 +148,7 @@ def run():
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
 
-    epochs = 12
+    epochs = 1
     batch_size = 32
 
     # Download pretrained vgg model
@@ -184,12 +181,15 @@ def run():
         # TODO: Train NN using the train_nn function
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
              correct_label, keep_prob, learning_rate)
+        
+        saver = tf.train.Saver()
+        tf.train.write_graph(sess.graph_def, './model', 'train.pb', as_text=False)
+        saver.save(sess, './model/model')
+        
         # TODO: Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
-
+        tf.train.Saver()
         #save graph
-        tf.train.write_graph(sess.graph_def, './model', 'train.pb', as_text=False)
-        
         # OPTIONAL: Apply the trained model to a video
 
 
