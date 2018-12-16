@@ -144,7 +144,7 @@ tests.test_train_nn(train_nn)
 def run():
     num_classes = 2
     image_shape = (160, 576)
-    data_dir = '/data'
+    data_dir = '/models/data'
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
 
