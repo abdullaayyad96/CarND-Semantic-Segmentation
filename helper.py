@@ -7,9 +7,12 @@ import shutil
 import zipfile
 import time
 import tensorflow as tf
+import cv2
+import math
 from glob import glob
 from urllib.request import urlretrieve
 from tqdm import tqdm
+
 
 
 class DLProgress(tqdm):
@@ -58,7 +61,7 @@ def maybe_download_pretrained_vgg(data_dir):
         os.remove(os.path.join(vgg_path, vgg_filename))
 
 
-def gen_batch_function(data_folder, image_shape):
+def gen_batch_function(data_folder, image_shape, num_classes):
     """
     Generate function to create batches of training data
     :param data_folder: Path to folder that contains all the datasets
@@ -76,6 +79,9 @@ def gen_batch_function(data_folder, image_shape):
             re.sub(r'_(lane|road)_', '_', os.path.basename(path)): path
             for path in glob(os.path.join(data_folder, 'gt_image_2', '*_road_*.png'))}
         background_color = np.array([255, 0, 0])
+        my_lane_color = np.array([255, 0, 255])
+        other_lane_color = np.array([0, 0, 0])
+        colors = np.array([background_color, my_lane_color, other_lane_color])
 
         if batch_size == -1:
             batch_size = len(image_paths)
@@ -90,10 +96,20 @@ def gen_batch_function(data_folder, image_shape):
                 image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
                 gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)
 
-                gt_bg = np.all(gt_image == background_color, axis=2)
+                '''
+                gt_bg = np.all(gt_image == my_lane_color, axis=2)
                 gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
                 gt_image = np.concatenate((gt_bg, np.invert(gt_bg)), axis=2)
-
+                '''
+                
+                temp_image = np.ndarray((*image_shape, num_classes))
+                for i in range(num_classes):
+                    gt_bg = np.all(gt_image == colors[i], axis=2)
+                    gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
+                    temp_image[:,:,i] = gt_bg[:,:,0]
+                
+                gt_image = temp_image
+                
                 images.append(image)
                 gt_images.append(gt_image)
 
@@ -101,7 +117,7 @@ def gen_batch_function(data_folder, image_shape):
     return get_batches_fn
 
 
-def gen_test_output(sess, logits, keep_prob, image_pl, data_folder, image_shape):
+def gen_test_output(sess, logits, keep_prob, image_pl, data_folder, image_shape, num_classes):
     """
     Generate test output using the test images
     :param sess: TF session
@@ -112,23 +128,30 @@ def gen_test_output(sess, logits, keep_prob, image_pl, data_folder, image_shape)
     :param image_shape: Tuple - Shape of image
     :return: Output for for each test image
     """
+    
     for image_file in glob(os.path.join(data_folder, 'image_2', '*.png')):
         image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
-		
+
         im_softmax = sess.run(
             [tf.nn.softmax(logits)],
             {keep_prob: 1.0, image_pl: [image]})
-        im_softmax = im_softmax[0][:, 1].reshape(image_shape[0], image_shape[1])
-        segmentation = (im_softmax > 0.5).reshape(image_shape[0], image_shape[1], 1)
-        mask = np.dot(segmentation, np.array([[0, 255, 0, 127]]))
-        mask = scipy.misc.toimage(mask, mode="RGBA")
+        
+        my_lane_color = np.array([[0, 255, 0, 127]])
+        other_lane_color = np.array([[0, 0, 255, 127]])
+        output_colors = np.array([my_lane_color, other_lane_color])
+        
         street_im = scipy.misc.toimage(image)
-        street_im.paste(mask, box=None, mask=mask)
-		
+        for i in range(num_classes-1):
+            tem_im_softmax = im_softmax[0][:, (i+1)].reshape(image_shape[0], image_shape[1])
+            segmentation = (tem_im_softmax > 0.5).reshape(image_shape[0], image_shape[1], 1)
+            mask = np.dot(segmentation, output_colors[i])
+            mask = scipy.misc.toimage(mask, mode="RGBA")
+            street_im.paste(mask, box=None, mask=mask)
+
         yield os.path.basename(image_file), np.array(street_im)
 
 
-def save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image):
+def save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image, num_classes):
     # Make folder for current run
     output_dir = os.path.join(runs_dir, str(time.time()))
     if os.path.exists(output_dir):
@@ -138,6 +161,82 @@ def save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_p
     # Run NN on test images and save them to HD
     print('Training Finished. Saving test images to: {}'.format(output_dir))
     image_outputs = gen_test_output(
-        sess, logits, keep_prob, input_image, os.path.join(data_dir, 'data_road/testing'), image_shape)
+        sess, logits, keep_prob, input_image, os.path.join(data_dir, 'data_road/testing'), image_shape, num_classes)
     for name, image in image_outputs:
         scipy.misc.imsave(os.path.join(output_dir, name), image)
+
+def augmentimg(image2aug, gt_image2aug):
+    #random msg to select which selector to use
+    method_selector = random.randint(1,4)
+    image_shape = image2aug.shape
+    
+    if(method_selector == 1):
+        #Apply prespective transfromation
+        
+        #getting random vertices of the image
+        x1 = random.randint(0, math.ceil(image_shape[1]/6))
+        x2 = random.randint(math.ceil(5 * image_shape[1]/6), image_shape[1])
+        y1 = random.randint(0, math.ceil(image_shape[0]/6))
+        y2 = random.randint(math.ceil(5 * image_shape[0]/6), image_shape[0])
+        
+        #applying prespective transformation
+        pts1 = np.float32([[x1,y1],[x2,y1],[x1,y2],[x2,y2]])
+        pts2 = np.float32([[0,0],[image_shape[1],0],[0,image_shape[0]],[image_shape[1],image_shape[0]]])
+        M = cv2.getPerspectiveTransform(pts1,pts2)
+        output_img = cv2.warpPerspective(image2aug,M,(image_shape[1],image_shape[0]))
+        gt_output_img = cv2.warpPerspective(gt_image2aug,M,(image_shape[1],image_shape[0]))
+        
+    elif(method_selector == 2):
+        #apply translation
+        
+        #getting random shifts for the image
+        shift_x = random.randint(-math.ceil(image_shape[1]/7), math.ceil(image_shape[1]/7))
+        shift_y = random.randint(-math.ceil(image_shape[0]/7), math.ceil(image_shape[0]/7))
+        
+        #applying translation
+        M = np.float32([[1,0,shift_x],[0,1,shift_y]])
+        output_img = cv2.warpAffine(image2aug,M,(image_shape[1],image_shape[0]))
+        gt_output_img = cv2.warpAffine(gt_image2aug,M,(image_shape[1],image_shape[0]), borderValue=[255,255,255])
+        
+    elif(method_selector == 3):
+        #apply rotation
+        
+        #obtaining random angle to rotate
+        angle2rotate = random.randint(-7, 7)
+        
+        #applying rotation
+        M = cv2.getRotationMatrix2D((math.ceil(image_shape[1]/2),math.ceil(image_shape[0]/2)),angle2rotate,1)
+        output_img = cv2.warpAffine(image2aug,M,(image_shape[1],image_shape[0]))
+        gt_output_img = cv2.warpAffine(gt_image2aug,M,(image_shape[1],image_shape[0]), borderValue=[255, 255, 255])
+        
+    elif(method_selector == 4):
+        #change brightness and contrast
+        
+        alpha = random.uniform(0.7, 1.3)
+        beta = random.randint(-20, 20)
+        
+        output_img = alpha*image2aug + beta
+        np.putmask(output_img, output_img>255, 255)
+        np.putmask(output_img, output_img<0, 0)
+        output_img = np.floor(output_img)
+        gt_output_img = gt_image2aug
+        
+    return output_img, gt_output_img
+
+
+def apply_augmentation(data_dir):
+    image_paths = glob(os.path.join(data_dir, 'training/image_2', '*.png'))
+    label_paths = {
+        re.sub(r'_(lane|road)_', '_', os.path.basename(path)): path
+        for path in glob(os.path.join(data_dir, 'training/gt_image_2', '*_road_*.png'))}  
+    
+    for i in range(len(image_paths)):
+        image = scipy.misc.imread(image_paths[i])
+        gt_image = scipy.misc.imread(label_paths[os.path.basename(image_paths[i])])
+        
+        augmented_image, gt_augmented_image = augmentimg(image, gt_image)
+        
+        scipy.misc.imsave((data_dir+'/training/image_2/augmented_{}.png').format(i), augmented_image)
+        scipy.misc.imsave((data_dir+'/training/gt_image_2/augmented_road_{}.png').format(i), gt_augmented_image)
+               
+        

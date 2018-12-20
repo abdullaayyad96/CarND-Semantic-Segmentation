@@ -35,6 +35,9 @@ def load_vgg(sess, vgg_path):
     
     tf.saved_model.loader.load(sess, [vgg_tag], vgg_path)
     graph = tf.get_default_graph()
+    #frozen_graph = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, ['layer7_out'])
+    #tf.import_graph_def(frozen_graph)
+    #graph = sess.graph
     input_tensor = graph.get_tensor_by_name(vgg_input_tensor_name)
     keep_prob = graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
     layer3_out = graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
@@ -109,8 +112,8 @@ tests.test_optimize(optimize)
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
              correct_label, keep_prob, learning_rate):
     """
-    Train neural network and print out the loss during training.
-    :param sess: TF Session
+    Train neural network and print    out the loss during training.
+  param sess: TF Session
     :param epochs: Number of epochs
     :param batch_size: Batch size
     :param get_batches_fn: Function to get batches of training data.  Call using get_batches_fn(batch_size)
@@ -142,13 +145,13 @@ tests.test_train_nn(train_nn)
 
 
 def run():
-    num_classes = 2
+    num_classes = 3
     image_shape = (160, 576)
-    data_dir = '/models/data'
+    data_dir = '/augmented_data/data'
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
 
-    epochs = 1
+    epochs = 10
     batch_size = 32
 
     # Download pretrained vgg model
@@ -166,7 +169,7 @@ def run():
         # Path to vgg model
         vgg_path = os.path.join(data_dir, 'vgg')
         # Create function to get batches
-        get_batches_fn = helper.gen_batch_function(os.path.join(data_dir, 'data_road/training'), image_shape)
+        get_batches_fn = helper.gen_batch_function(os.path.join(data_dir, 'data_road/training'), image_shape, num_classes)
 
         # OPTIONAL: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
@@ -183,12 +186,15 @@ def run():
              correct_label, keep_prob, learning_rate)
         
         saver = tf.train.Saver()
-        tf.train.write_graph(sess.graph_def, './model', 'train.pb', as_text=False)
-        saver.save(sess, './model/model')
+        tf.train.write_graph(sess.graph_def, '/model', 'train.pb', as_text=False)
+        saver.save(sess, '/model/model')
+        
+        input_graph = sess.graph_def
+        output_graph = tf.graph_util.convert_variables_to_constants(sess, input_graph, ['logits'])
+        tf.train.write_graph(output_graph, '/model', 'frozen_graph.pb', as_text=False)
         
         # TODO: Save inference data using helper.save_inference_samples
-        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
-        tf.train.Saver()
+        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image, num_classes)
         #save graph
         # OPTIONAL: Apply the trained model to a video
 
