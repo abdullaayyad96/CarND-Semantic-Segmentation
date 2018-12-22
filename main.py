@@ -35,9 +35,8 @@ def load_vgg(sess, vgg_path):
     
     tf.saved_model.loader.load(sess, [vgg_tag], vgg_path)
     graph = tf.get_default_graph()
-    #frozen_graph = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, ['layer7_out'])
-    #tf.import_graph_def(frozen_graph)
-    #graph = sess.graph
+        
+    #load tensors
     input_tensor = graph.get_tensor_by_name(vgg_input_tensor_name)
     keep_prob = graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
     layer3_out = graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
@@ -57,30 +56,40 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
-    #scale layers 3 and 4
-    layer3_scaled = tf.scalar_mul(0.0001, vgg_layer3_out)
-    layer3_conv1x1 = tf.layers.conv2d(layer3_scaled, num_classes, 1, (1,1), padding='same',                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer3_1x1conv')
-    
-    layer4_scaled = tf.scalar_mul(0.01, vgg_layer4_out)
-    layer4_conv1x1 = tf.layers.conv2d(layer4_scaled, num_classes, 1, (1,1), padding='same',                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer4_1x1conv')
-
-    #1x1 convolutions to obtain desired number of num_classes
+  
+    #1x1 convolution to obtain desired number of num_classes
     conv1x1_1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, (1,1), padding='same',                                      kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer7_1x1conv')
    
+    #deconvolution 
     deconv_1 = tf.layers.conv2d_transpose(conv1x1_1, num_classes, 4, 2, padding='same', 
                                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer7_deconv')
     
+    #scale layer4 
+    layer4_scaled = tf.scalar_mul(0.01, vgg_layer4_out)
+    
+    #1x1 convolution for scaled layer 4
+    layer4_conv1x1 = tf.layers.conv2d(layer4_scaled, num_classes, 1, (1,1), padding='same',                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer4_1x1conv')
+    
+    #first skipping layer
     skip_1 = tf.add(deconv_1, layer4_conv1x1, name='layer_7_add_4')
 
+    #deconvolution 
     deconv_2 = tf.layers.conv2d_transpose(skip_1, num_classes, 4, 2, padding='same', 
                                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer_74_deconv')
     
+    #scale layers3 
+    layer3_scaled = tf.scalar_mul(0.0001, vgg_layer3_out)
+    
+    #1x1 convolution for scaled layer 3
+    layer3_conv1x1 = tf.layers.conv2d(layer3_scaled, num_classes, 1, (1,1), padding='same',                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='layer3_1x1conv')
+    
+    #skipping layer 2
     skip_2 = tf.add(deconv_2, layer3_conv1x1, name='layer_7_add_3')
 
+    #output layer
     output_layer = tf.layers.conv2d_transpose(skip_2, num_classes, 16, 8, padding='same',
                                               kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), name='output_layer')
         
-    # TODO: Implement function
     return output_layer
 tests.test_layers(layers)
 
@@ -94,13 +103,15 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :param num_classes: Number of classes to classify
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
+    #reshape logits to be same size of labels
     logits = tf.reshape(nn_last_layer, (-1, num_classes), name='logits')
     
-    # TODO: Implement function
     reg_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES) #regularization loss
-    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=nn_last_layer, labels=correct_label), name='cross_entropy_loss')
+    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=nn_last_layer, labels=correct_label), name='cross_entropy_loss') #cross entropy
+    #overall loss combining cross entropy and regularization
     overall_loss = tf.add(1.0*sum(reg_loss), cross_entropy_loss, name='total_loss')
     
+    #obtain training operation
     optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate)
     training_operation = optimizer.minimize(overall_loss, name='train_op')
 
@@ -124,31 +135,30 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param keep_prob: TF Placeholder for dropout keep probability
     :param learning_rate: TF Placeholder for learning rate
     """
-    # TODO: Implement function
+    #initialize variables
     sess.run(tf.global_variables_initializer())
     
     print("Training...")
     print()
 
     for i in range(epochs):
-        #full_images, full_labels = get_batches_fn(-1)
         print("EPOCH {} ...".format(i+1))
         for image, label in get_batches_fn(batch_size):
 
             optimizer, loss = sess.run([train_op, cross_entropy_loss], 
                                feed_dict={input_image: image, correct_label: label, keep_prob: 0.5})
             print("Loss: = {:.3f}".format(loss))
-        
             print()
-
 tests.test_train_nn(train_nn)
 
 
 def run():
     num_classes = 3
     image_shape = (160, 576)
-    data_dir = '/augmented_data/data'
+    data_dir = '/data'
+    augmented_data_dir = '/modified_data'
     runs_dir = './runs'
+    model_dir = './model'
     tests.test_for_kitti_dataset(data_dir)
 
     epochs = 10
@@ -157,10 +167,10 @@ def run():
     # Download pretrained vgg model
     helper.maybe_download_pretrained_vgg(data_dir)
 
-    # OPTIONAL: Train and Inference on the cityscapes dataset instead of the Kitti dataset.
-    # You'll need a GPU with at least 10 teraFLOPS to train on.
-    #  https://www.cityscapes-dataset.com/
-
+    #augment the data
+    print('Augmentation starting ...')
+    helper.apply_augmentation(data_dir, augmented_data_dir)
+    print('Augmentation finished')
     
     correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes], name='correct_label')
     learning_rate = 0.0005
@@ -168,36 +178,29 @@ def run():
     with tf.Session() as sess:
         # Path to vgg model
         vgg_path = os.path.join(data_dir, 'vgg')
-        # Create function to get batches
-        get_batches_fn = helper.gen_batch_function(os.path.join(data_dir, 'data_road/training'), image_shape, num_classes)
+        # get batches
+        get_batches_fn = helper.gen_batch_function(augmented_data_dir, image_shape, num_classes)
 
-        # OPTIONAL: Augment Images for better results
-        #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
-
-        # TODO: Build NN using load_vgg, layers, and optimize function
+        # Build NN using load_vgg, layers, and optimize function
         input_image, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
-
         nn_last_layer = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
 
         logits, train_op, cross_entropy_loss = optimize(nn_last_layer, correct_label, learning_rate, num_classes)
         
-        # TODO: Train NN using the train_nn function
+        # Train NN using the train_nn function
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
              correct_label, keep_prob, learning_rate)
-        
-        saver = tf.train.Saver()
-        tf.train.write_graph(sess.graph_def, '/model', 'train.pb', as_text=False)
-        saver.save(sess, '/model/model')
-        
-        input_graph = sess.graph_def
-        output_graph = tf.graph_util.convert_variables_to_constants(sess, input_graph, ['logits'])
-        tf.train.write_graph(output_graph, '/model', 'frozen_graph.pb', as_text=False)
-        
-        # TODO: Save inference data using helper.save_inference_samples
+                
+        # Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image, num_classes)
-        #save graph
-        # OPTIONAL: Apply the trained model to a video
-
+        
+        # save trained model and frozen graph
+        saver = tf.train.Saver()
+        tf.train.write_graph(sess.graph_def, model_dir, 'train.pb', as_text=False)
+        saver.save(sess, model_dir+'/model')
+        output_graph = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, ['logits'])
+        tf.train.write_graph(output_graph, model_dir, 'frozen_graph.pb', as_text=False)
+        
 
 if __name__ == '__main__':
     run()

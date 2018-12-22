@@ -149,6 +149,6 @@ def test_for_kitti_dataset(data_dir):
 
     assert not (training_images_count == training_labels_count == testing_images_count == 0),\
         'Kitti dataset not found. Extract Kitti dataset in {}'.format(kitti_dataset_path)
-    assert training_images_count == 578, 'Expected 578 training images, found {} images.'.format(training_images_count)#289
-    assert training_labels_count == 578, 'Expected 578 training labels, found {} labels.'.format(training_labels_count)#289
+    assert training_images_count == 289, 'Expected 289 training images, found {} images.'.format(training_images_count)
+    assert training_labels_count == 289, 'Expected 289 training labels, found {} labels.'.format(training_labels_count)
     assert testing_images_count == 290, 'Expected 290 testing images, found {} images.'.format(testing_images_count)

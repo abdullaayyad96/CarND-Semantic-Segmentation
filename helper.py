@@ -77,7 +77,7 @@ def gen_batch_function(data_folder, image_shape, num_classes):
         image_paths = glob(os.path.join(data_folder, 'image_2', '*.png'))
         label_paths = {
             re.sub(r'_(lane|road)_', '_', os.path.basename(path)): path
-            for path in glob(os.path.join(data_folder, 'gt_image_2', '*_road_*.png'))}
+            for path in glob(os.path.join(data_folder, 'gt_image_2', '*.png'))}
         background_color = np.array([255, 0, 0])
         my_lane_color = np.array([255, 0, 255])
         other_lane_color = np.array([0, 0, 0])
@@ -92,15 +92,9 @@ def gen_batch_function(data_folder, image_shape, num_classes):
             gt_images = []
             for image_file in image_paths[batch_i:batch_i+batch_size]:
                 gt_image_file = label_paths[os.path.basename(image_file)]
-
+                
                 image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
                 gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)
-
-                '''
-                gt_bg = np.all(gt_image == my_lane_color, axis=2)
-                gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
-                gt_image = np.concatenate((gt_bg, np.invert(gt_bg)), axis=2)
-                '''
                 
                 temp_image = np.ndarray((*image_shape, num_classes))
                 for i in range(num_classes):
@@ -166,8 +160,10 @@ def save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_p
         scipy.misc.imsave(os.path.join(output_dir, name), image)
 
 def augmentimg(image2aug, gt_image2aug):
-    #random msg to select which selector to use
+    #generate augmented version of images    
+    #random integer to select which selector to use
     method_selector = random.randint(1,4)
+    
     image_shape = image2aug.shape
     
     if(method_selector == 1):
@@ -224,19 +220,33 @@ def augmentimg(image2aug, gt_image2aug):
     return output_img, gt_output_img
 
 
-def apply_augmentation(data_dir):
-    image_paths = glob(os.path.join(data_dir, 'training/image_2', '*.png'))
-    label_paths = {
-        re.sub(r'_(lane|road)_', '_', os.path.basename(path)): path
-        for path in glob(os.path.join(data_dir, 'training/gt_image_2', '*_road_*.png'))}  
+def apply_augmentation(data_dir, output_dir):
+    #load, augment and save images
+    image_paths = glob(os.path.join(data_dir, 'data_road/training/image_2', '*.png'))
+    label_paths = {}    
+    for path in glob(os.path.join(data_dir, 'data_road/training/gt_image_2', '*_road_*.png')):
+        label_paths[re.sub(r'_(lane|road)_', '_', os.path.basename(path))] = path
+        
+    # Make folder for augmented images
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
+    os.makedirs(output_dir+'/image_2')
+    os.makedirs(output_dir+'/gt_image_2')
     
+    #iterate over images
     for i in range(len(image_paths)):
-        image = scipy.misc.imread(image_paths[i])
-        gt_image = scipy.misc.imread(label_paths[os.path.basename(image_paths[i])])
-        
-        augmented_image, gt_augmented_image = augmentimg(image, gt_image)
-        
-        scipy.misc.imsave((data_dir+'/training/image_2/augmented_{}.png').format(i), augmented_image)
-        scipy.misc.imsave((data_dir+'/training/gt_image_2/augmented_road_{}.png').format(i), gt_augmented_image)
+        if 'augmented' not in image_paths[i]:
+            image = scipy.misc.imread(image_paths[i])
+            gt_image = scipy.misc.imread(label_paths[os.path.basename(image_paths[i])])
+
+            #apply augmentation
+            augmented_image, gt_augmented_image = augmentimg(image, gt_image)
+
+            #save original image
+            scipy.misc.imsave((output_dir+'/image_2/original_{}.png').format(i), image)
+            scipy.misc.imsave((output_dir+'/gt_image_2/original_{}.png').format(i), gt_image)
+            #save augmented image
+            scipy.misc.imsave((output_dir+'/image_2/augmented_{}.png').format(i), augmented_image)
+            scipy.misc.imsave((output_dir+'/gt_image_2/augmented_{}.png').format(i), gt_augmented_image)
                
         
