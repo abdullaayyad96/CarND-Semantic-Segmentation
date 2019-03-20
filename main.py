@@ -59,39 +59,39 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
   
     #1x1 convolution to obtain desired number of num_classes
     conv1x1_1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, (1,1), padding='same',
-									kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.truncated_normal_initializer(stddev=1), name='layer7_1x1conv')
+									kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.contrib.layers.xavier_initializer(), name='layer7_1x1conv')
    
     #deconvolution 
     deconv_1 = tf.layers.conv2d_transpose(conv1x1_1, num_classes, 4, 2, padding='same', 
-											kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.truncated_normal_initializer(stddev=1), name='layer7_deconv')
+											kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.contrib.layers.xavier_initializer(), name='layer7_deconv')
     
     #scale layer4 
     layer4_scaled = tf.scalar_mul(0.01, vgg_layer4_out)
     
     #1x1 convolution for scaled layer 4
     layer4_conv1x1 = tf.layers.conv2d(layer4_scaled, num_classes, 1, (1,1), padding='same',
-										kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.truncated_normal_initializer(stddev=1), name='layer4_1x1conv')
+										kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.contrib.layers.xavier_initializer(), name='layer4_1x1conv')
     
     #first skipping layer
     skip_1 = tf.add(deconv_1, layer4_conv1x1, name='layer_7_add_4')
 
     #deconvolution 
     deconv_2 = tf.layers.conv2d_transpose(skip_1, num_classes, 4, 2, padding='same',
-											kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.truncated_normal_initializer(stddev=1), name='layer_74_deconv')
+											kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.contrib.layers.xavier_initializer() name='layer_74_deconv')
     
     #scale layers3 
     layer3_scaled = tf.scalar_mul(0.0001, vgg_layer3_out)
     
     #1x1 convolution for scaled layer 3
     layer3_conv1x1 = tf.layers.conv2d(layer3_scaled, num_classes, 1, (1,1), padding='same',
-										kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.truncated_normal_initializer(stddev=1), name='layer3_1x1conv')
+										kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.contrib.layers.xavier_initializer(), name='layer3_1x1conv')
     
     #skipping layer 2
     skip_2 = tf.add(deconv_2, layer3_conv1x1, name='layer_7_add_3')
 
     #output layer
     output_layer = tf.layers.conv2d_transpose(skip_2, num_classes, 16, 8, padding='same',
-												kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.truncated_normal_initializer(stddev=1), name='output_layer')
+												kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.contrib.layers.xavier_initializer(), name='output_layer')
         
     return output_layer
 tests.test_layers(layers)
