@@ -77,7 +77,7 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
 
     #deconvolution 
     deconv_2 = tf.layers.conv2d_transpose(skip_1, num_classes, 4, 2, padding='same',
-											kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.contrib.layers.xavier_initializer() name='layer_74_deconv')
+											kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3), kernel_initializer=tf.contrib.layers.xavier_initializer(), name='layer_74_deconv')
     
     #scale layers3 
     layer3_scaled = tf.scalar_mul(0.0001, vgg_layer3_out)
@@ -115,11 +115,12 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     overall_loss = tf.add(1.0*sum(reg_loss), cross_entropy_loss, name='total_loss')
   
     #obtain training operation
-    optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate)
+    optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate, epsilon = 0.0001) #Note default value of epsilon 1e-8 results in instability after few epochs
+   
+    #clip the gradients
     gvs = optimizer.compute_gradients(overall_loss)
     capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
     training_operation = optimizer.apply_gradients(capped_gvs)
-    #training_operation = optimizer.minimize(overall_loss, name='train_op')
 
     return logits, training_operation, overall_loss
 
@@ -179,7 +180,7 @@ def run():
     print('Augmentation finished')
     
     correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes], name='correct_label')
-    learning_rate = 0.0001
+    learning_rate = 0.00005
 
     with tf.Session() as sess:
         # Path to vgg model
