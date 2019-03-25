@@ -115,7 +115,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     overall_loss = tf.add(1.0*sum(reg_loss), cross_entropy_loss, name='total_loss')
   
     #obtain training operation
-    optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate, epsilon = 0.0001) #Note default value of epsilon 1e-8 results in instability after few epochs
+    optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate, epsilon = 0.000001) #Note default value of epsilon 1e-8 results in instability after few epochs
    
     #clip the gradients
     gvs = optimizer.compute_gradients(overall_loss)
@@ -168,7 +168,7 @@ def run():
     model_dir = 'model'
     tests.test_for_kitti_dataset(data_dir)
 
-    epochs = 20
+    epochs = 15
     batch_size = 5
 
     # Download pretrained vgg model

@@ -160,62 +160,16 @@ def save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_p
         scipy.misc.imsave(os.path.join(output_dir, name), image)
 
 def augmentimg(image2aug, gt_image2aug):
-    #generate augmented version of images    
-    #random integer to select which selector to use
-    method_selector = random.randint(1,4)
+    #generate augmented version of images by changing brightness and contrast
     
-    image_shape = image2aug.shape
-    
-    if(method_selector == 1):
-        #Apply prespective transfromation
-        
-        #getting random vertices of the image
-        x1 = random.randint(0, math.ceil(image_shape[1]/6))
-        x2 = random.randint(math.ceil(5 * image_shape[1]/6), image_shape[1])
-        y1 = random.randint(0, math.ceil(image_shape[0]/6))
-        y2 = random.randint(math.ceil(5 * image_shape[0]/6), image_shape[0])
-        
-        #applying prespective transformation
-        pts1 = np.float32([[x1,y1],[x2,y1],[x1,y2],[x2,y2]])
-        pts2 = np.float32([[0,0],[image_shape[1],0],[0,image_shape[0]],[image_shape[1],image_shape[0]]])
-        M = cv2.getPerspectiveTransform(pts1,pts2)
-        output_img = cv2.warpPerspective(image2aug,M,(image_shape[1],image_shape[0]))
-        gt_output_img = cv2.warpPerspective(gt_image2aug,M,(image_shape[1],image_shape[0]))
-        
-    elif(method_selector == 2):
-        #apply translation
-        
-        #getting random shifts for the image
-        shift_x = random.randint(-math.ceil(image_shape[1]/7), math.ceil(image_shape[1]/7))
-        shift_y = random.randint(-math.ceil(image_shape[0]/7), math.ceil(image_shape[0]/7))
-        
-        #applying translation
-        M = np.float32([[1,0,shift_x],[0,1,shift_y]])
-        output_img = cv2.warpAffine(image2aug,M,(image_shape[1],image_shape[0]))
-        gt_output_img = cv2.warpAffine(gt_image2aug,M,(image_shape[1],image_shape[0]), borderValue=[255,255,255])
-        
-    elif(method_selector == 3):
-        #apply rotation
-        
-        #obtaining random angle to rotate
-        angle2rotate = random.randint(-7, 7)
-        
-        #applying rotation
-        M = cv2.getRotationMatrix2D((math.ceil(image_shape[1]/2),math.ceil(image_shape[0]/2)),angle2rotate,1)
-        output_img = cv2.warpAffine(image2aug,M,(image_shape[1],image_shape[0]))
-        gt_output_img = cv2.warpAffine(gt_image2aug,M,(image_shape[1],image_shape[0]), borderValue=[255, 255, 255])
-        
-    elif(method_selector == 4):
-        #change brightness and contrast
-        
-        alpha = random.uniform(0.7, 1.3)
-        beta = random.randint(-20, 20)
-        
-        output_img = alpha*image2aug + beta
-        np.putmask(output_img, output_img>255, 255)
-        np.putmask(output_img, output_img<0, 0)
-        output_img = np.floor(output_img)
-        gt_output_img = gt_image2aug
+    alpha = random.uniform(0.7, 1.3)
+    beta = random.randint(-20, 20)
+
+    output_img = alpha*image2aug + beta
+    np.putmask(output_img, output_img>255, 255)
+    np.putmask(output_img, output_img<0, 0)
+    output_img = np.floor(output_img)
+    gt_output_img = gt_image2aug
         
     return output_img, gt_output_img
 
