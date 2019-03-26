@@ -15,8 +15,19 @@ def run():
         # load pre trained model 
         saver = tf.train.import_meta_graph(model_dir)
         
-        saver.restore(sess, tf.train.latest_checkpoint('./'))
-            
+        saver.restore(sess, tf.train.latest_checkpoint('model'))
+        
+        tvar = tf.all_variables()
+        
+        graph = tf.get_default_graph()
+       
+        logits = graph.get_tensor_by_name('logits:0')        
+        
+        vgg_keep_prob_tensor_name = 'keep_prob:0'
+        keep_prob = graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
+        
+        input_image = graph.get_tensor_by_name('image_input:0')  
+        
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image, num_classes)
                 
         
