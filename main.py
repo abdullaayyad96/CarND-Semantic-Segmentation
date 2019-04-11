@@ -201,13 +201,10 @@ def run():
         # Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image, num_classes)
         
-        # save trained model and frozen graph
+        # save trained model
         saver = tf.train.Saver()
-        tf.train.write_graph(sess.graph_def, model_dir, 'train.pb', as_text=False)
         saver.save(sess, model_dir+'/model')
-        output_graph = tf.graph_util.convert_variables_to_constants(sess, sess.graph_def, ['logits'])
-        tf.train.write_graph(output_graph, model_dir, 'frozen_graph.pb', as_text=False)
-        
+ 
 
 if __name__ == '__main__':
     run()

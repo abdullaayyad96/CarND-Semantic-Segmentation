@@ -7,7 +7,6 @@ import shutil
 import zipfile
 import time
 import tensorflow as tf
-import cv2
 import math
 from glob import glob
 from urllib.request import urlretrieve
