@@ -101,3 +101,7 @@ ENV/
 .mypy_cache/
 
 RUNS/
+modified_data/
+runs/
+data/
+runs/
