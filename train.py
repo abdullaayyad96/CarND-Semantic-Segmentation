@@ -159,7 +159,8 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
 tests.test_train_nn(train_nn)
 
 
-def run():
+def train():
+
     num_classes = 3
     image_shape = (160, 576)
     data_dir = 'data'
@@ -207,4 +208,4 @@ def run():
  
 
 if __name__ == '__main__':
-    run()
+    train()

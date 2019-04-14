@@ -1,48 +1,76 @@
 # Semantic Segmentation
-### Introduction
-In this project, you'll label the pixels of a road in images using a Fully Convolutional Network (FCN).
+[![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
 
-### Setup
-##### GPU
-`main.py` will check to make sure you are using GPU - if you don't have a GPU on your system, you can use AWS or another cloud computing platform.
-##### Frameworks and Packages
-Make sure you have the following is installed:
- - [Python 3](https://www.python.org/)
- - [TensorFlow](https://www.tensorflow.org/)
- - [NumPy](http://www.numpy.org/)
- - [SciPy](https://www.scipy.org/)
-##### Dataset
-Download the [Kitti Road dataset](http://www.cvlibs.net/datasets/kitti/eval_road.php) from [here](http://www.cvlibs.net/download.php?file=data_road.zip).  Extract the dataset in the `data` folder.  This will create the folder `data_road` with all the training a test images.
+[image1]: ./Overview.jpg "Overview"
+[image2]: ./NN_architecture.jpg "NN architecture"
+[image3]: ./test_output/test_1.png "output image 1"
+[image4]: ./test_output/test_4.png "output image 5"
 
-### Start
-##### Implement
-Implement the code in the `main.py` module indicated by the "TODO" comments.
-The comments indicated with "OPTIONAL" tag are not required to complete.
-##### Run
-Run the following command to run the project:
+## Introduction
+In this project, a fully convolutional neural network (FCNN) is developed and trained in tensorflow to label the drivable area of a road images.
+
+![alt_text][image1]
+
+The project has been built according to this [rubric](https://review.udacity.com/#!/rubrics/989/view).
+
+## Dependencies
+
+* Python3 
+* Tensorflow
+* NumPy
+* tqdm
+* SciPy
+
+## Usage 
+
+### Training
+
+1) Ensure the training data set is located in the `data\` directory. If not, run the `data/download_data.sh` script to download and extract the training data.
+2) Run the following command to build, train and save the FCNN"
 ```
-python main.py
+python train.py
 ```
-**Note** If running this in Jupyter Notebook system messages, such as those regarding test status, may appear in the terminal rather than the notebook.
+In case you want to change the deep learniing archicture or the training options, you can do so from `train.py`.
 
-### Submission
-1. Ensure you've passed all the unit tests.
-2. Ensure you pass all points on [the rubric](https://review.udacity.com/#!/rubrics/989/view).
-3. Submit the following in a zip file.
- - `helper.py`
- - `main.py`
- - `project_tests.py`
- - Newest inference images from `runs` folder  (**all images from the most recent run**)
- 
- ### Tips
-- The link for the frozen `VGG16` model is hardcoded into `helper.py`.  The model can be found [here](https://s3-us-west-1.amazonaws.com/udacity-selfdrivingcar/vgg.zip).
-- The model is not vanilla `VGG16`, but a fully convolutional version, which already contains the 1x1 convolutions to replace the fully connected layers. Please see this [post](https://s3-us-west-1.amazonaws.com/udacity-selfdrivingcar/forum_archive/Semantic_Segmentation_advice.pdf) for more information.  A summary of additional points, follow. 
-- The original FCN-8s was trained in stages. The authors later uploaded a version that was trained all at once to their GitHub repo.  The version in the GitHub repo has one important difference: The outputs of pooling layers 3 and 4 are scaled before they are fed into the 1x1 convolutions.  As a result, some students have found that the model learns much better with the scaling layers included. The model may not converge substantially faster, but may reach a higher IoU and accuracy. 
-- When adding l2-regularization, setting a regularizer in the arguments of the `tf.layers` is not enough. Regularization loss terms must be manually added to your loss function. otherwise regularization is not implemented.
- 
-### Using GitHub and Creating Effective READMEs
-If you are unfamiliar with GitHub , Udacity has a brief [GitHub tutorial](http://blog.udacity.com/2015/06/a-beginners-git-github-tutorial.html) to get you started. Udacity also provides a more detailed free [course on git and GitHub](https://www.udacity.com/course/how-to-use-git-and-github--ud775).
+### Inference
 
-To learn about REAMDE files and Markdown, Udacity provides a free [course on READMEs](https://www.udacity.com/courses/ud777), as well. 
+1) Ensure you have a trained deep learning model saved in the `model\` directory. If not, run the `model/download_model.sh` script to download and extract a pre-trained model.
+2) Run the following command to run the pipeline on any png image of your choice:
+```
+python run.py input_image.png output_directory/
+```
+The python script will run the pipeline and generate labeled copies of the input images in the output_directory.
 
-GitHub also provides a [tutorial](https://guides.github.com/features/mastering-markdown/) about creating Markdown files.
+## Deep Learning Architecture & Training
+
+### Architecture
+The deep learning model implemented in this project utilizes a fully convolutional structure to label the drivable area. The Encoder part of the model is adopted from the `vgg16` structure while the decoder part was built from scratch.
+
+The overall architecture of the final neural network model can be seen below:
+
+![alt_text][image2]
+
+### Training options
+```
+Optimizer: Adam optimizer
+Learning rate: 0.00005
+Btach size: 5
+Epochs: 15
+```
+
+### Training Data
+For training purposes, the [Kitti Road dataset](http://www.cvlibs.net/datasets/kitti/eval_road.php) was used. The dataset can be downloaded from [here](http://www.cvlibs.net/download.php?file=data_road.zip).
+
+## Testing
+
+The results of running the pipeline on the test set of the Kitti Road dataset can be seen in the [runs/](runs/) directory.
+
+Additional images can be seen in the `test_images\` with their respective output in `test_output\`. Sample output images can be seen below:
+
+Sample 1:
+
+![alt_text][image3]
+
+Sample 2:
+
+![alt_text][image4]
